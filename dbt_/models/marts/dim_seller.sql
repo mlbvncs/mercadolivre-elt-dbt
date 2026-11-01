@@ -1,6 +1,6 @@
 {{ config(
     materialized='external',
-    location='s3://mlbvncs-valuemetrics-dev/gold/mercadolivre/celulares-e-telefones/dim_seller.parquet',
+    location='s3://mlbvncs-valuemetrics-dev/gold/mercadolivre/iphone-18-pro-max/dim_seller.parquet',
     format='parquet'
 ) }}
 

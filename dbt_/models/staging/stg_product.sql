@@ -7,13 +7,13 @@ WITH product_silver AS (
 
 stg_product AS (
     SELECT
-        COALESCE(sku, 'Sem informação') AS sku,
-        COALESCE(ean, 'Sem informação') AS ean,
-        COALESCE(image_url, 'Sem informação') AS image_url,
-        COALESCE(category_id, 'Sem informação') AS category_id,
-        COALESCE(domain_id, 'Sem informação') AS domain_id,
-        COALESCE(name, 'Sem informação') AS name,
-        COALESCE(condition, 'Sem informação') AS condition
+        COALESCE(NULLIF(sku, ''), 'Sem informação') AS sku,
+        COALESCE(NULLIF(ean, ''), 'Sem informação') AS ean,
+        COALESCE(NULLIF(image_url, ''), 'Sem informação') AS image_url,
+        COALESCE(NULLIF(category_id, ''), 'Sem informação') AS category_id,
+        COALESCE(NULLIF(domain_id, ''), 'Sem informação') AS domain_id,
+        COALESCE(NULLIF(name, ''), 'Sem informação') AS name,
+        COALESCE(NULLIF(condition, ''), 'Sem informação') AS condition
     FROM product_silver
 ),
 

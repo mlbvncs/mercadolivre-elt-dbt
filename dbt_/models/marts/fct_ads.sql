@@ -1,6 +1,6 @@
 {{ config(
     materialized='external',
-    location='s3://mlbvncs-valuemetrics-dev/gold/mercadolivre/celulares-e-telefones/fct_ads.parquet',
+    location='s3://mlbvncs-valuemetrics-dev/gold/mercadolivre/iphone-18-pro-max/fct_ads.parquet',
     format='parquet'
 ) }}
 
@@ -19,9 +19,9 @@ dim_product as (
     FROM {{ ref('dim_product') }}
 ),
 
-dim_promotion as (
+dim_highlight as (
     SELECT *
-    FROM {{ ref('dim_promotion') }}
+    FROM {{ ref('dim_highlight') }}
 ),
 
 dim_seller as (
@@ -32,7 +32,7 @@ dim_seller as (
 SELECT
     dc.currency_key AS currency_key,
     dprod.product_key AS product_key,
-    dprom.promotion_key AS promotion_key,
+    dh.highlight_key AS highlight_key,
     ds.seller_key AS seller_key,
     s.price AS price,
     s.rating AS rating,
@@ -51,8 +51,8 @@ LEFT JOIN dim_product dprod
     AND s.domain_id = dprod.domain_id
     AND s.name = dprod.name
     AND s.condition = dprod.condition
-LEFT JOIN dim_promotion dprom
-    ON s.highlight = dprom.highlight
+LEFT JOIN dim_highlight dh
+    ON s.highlight = dh.highlight
 LEFT JOIN dim_seller ds
     ON s.seller_id = ds.seller_id
     AND s.seller_name = ds.seller_name

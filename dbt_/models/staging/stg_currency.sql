@@ -7,8 +7,8 @@ WITH currency_silver AS (
 
 stg_currency AS (
     SELECT
-        COALESCE(currency, 'Sem informação') AS currency,
-        COALESCE(currency_raw, 'Sem informação') AS currency_raw,
+        COALESCE(NULLIF(currency, ''), 'Sem informação') AS currency,
+        COALESCE(NULLIF(currency_raw, ''), 'Sem informação') AS currency_raw,
     FROM currency_silver
 ),
 

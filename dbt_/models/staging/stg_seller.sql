@@ -7,11 +7,11 @@ WITH seller_silver AS (
 
 stg_seller AS (
     SELECT
-        COALESCE(seller_id, 'Sem informação') AS seller_id,
-        COALESCE(seller_name, 'Sem informação') AS seller_name,
-        COALESCE(seller_city, 'Sem informação') AS seller_city,
-        COALESCE(seller_state, 'Sem informação') AS seller_state,
-        COALESCE(seller_country, 'Sem informação') AS seller_country,
+        COALESCE(NULLIF(seller_id, ''), 'Sem informação') AS seller_id,
+        COALESCE(NULLIF(seller_name, ''), 'Sem informação') AS seller_name,
+        COALESCE(NULLIF(seller_city, ''), 'Sem informação') AS seller_city,
+        COALESCE(NULLIF(seller_state, ''), 'Sem informação') AS seller_state,
+        COALESCE(NULLIF(seller_country, ''), 'Sem informação') AS seller_country,
         CASE
             WHEN is_best_seller IS NULL THEN 'Sem informação'
             WHEN is_best_seller THEN 'Verdadeiro'
@@ -22,7 +22,7 @@ stg_seller AS (
             WHEN is_power_seller THEN 'Verdadeiro'
             ELSE 'Falso'
         END AS is_power_seller,
-        COALESCE(power_seller_status_title, 'Sem informação') AS power_seller_status_title
+        COALESCE(NULLIF(power_seller_status_title, ''), 'Sem informação') AS power_seller_status_title
     FROM seller_silver
 ),
 

@@ -14,7 +14,7 @@ p = Path(__file__).parent.resolve().parent
 Path(p / 'logs').mkdir(parents=True, exist_ok=True)
 
 format = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-filename_path = Path(p / 'logs' / 'transform_data.log')
+filename_path = p / 'logs' / 'transform_data.log'
 logging.basicConfig(format=format, filename=filename_path, encoding='utf-8', level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -66,7 +66,7 @@ def extract_data():
         )
         response = s3_client.get_object(
             Bucket=os.getenv('S3_BUCKET_NAME'), 
-            Key=f"bronze/mercadolivre/celulares-e-telefones/{os.getenv('EXTRACT_DATETIME')}/bronze_data.json"
+            Key=f"bronze/mercadolivre/iphone-18-pro-max/{os.getenv('EXTRACT_DATETIME')}/bronze_data.json"
         )
         data = json.loads(response['Body'].read().decode('utf-8'))
         logger.info("bronze_data.json obtained from Amazon S3")
@@ -100,8 +100,7 @@ def drop_unnecessary(df: pd.DataFrame, drop_columns: list) -> pd.DataFrame:
 
 #3
 def rename_columns(df: pd.DataFrame, columns_to_rename: dict) -> pd.DataFrame:
-    for key, value in columns_to_rename.items():
-        df.rename(columns={key: value}, inplace=True)
+    df = df.rename(columns=columns_to_rename)
 
     return df
 
@@ -147,11 +146,25 @@ def treat_outliers(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 #6
+def normalize_format(df: pd.DataFrame) -> pd.DataFrame:
+    #extracted_at
+    df['extracted_at'] = pd.to_datetime(df["extracted_at"])
+    df['extracted_at'] = df["extracted_at"].dt.strftime('%Y-%m-%dT%H-%M-%S')
+
+    #name
+    df['name'] = (df['name']
+                  .str.strip()
+                  .str.replace(r"\s+", " ", regex=True)
+                  .str.replace(r"(\d+)\s*gb", r"\1GB", case=False, regex=True)
+                  .str.replace(r"(\d+)\s*tb", r"\1TB", case=False, regex=True)
+                  )
+
+    return df
 
 #7
 def treat_identification_columns(df: pd.DataFrame) -> pd.DataFrame:
     #unique
-    df.drop_duplicates(subset=['url'], inplace=True, ignore_index=True)
+    df = df.drop_duplicates(subset=['url'], ignore_index=True)
     other_columns = [col for col in df.columns if col != 'url']
     df = df.reindex(columns=['url'] + other_columns)
     
@@ -159,7 +172,7 @@ def treat_identification_columns(df: pd.DataFrame) -> pd.DataFrame:
 
 def upload_data(df, upload_date_time_str, key=None):
     if key is None:
-        key = f"silver/mercadolivre/celulares-e-telefones/{upload_date_time_str}/silver_data.parquet"
+        key = f"silver/mercadolivre/iphone-18-pro-max/{upload_date_time_str}/silver_data.parquet"
 
     try:
         parquet_buffer = io.BytesIO()
@@ -186,7 +199,7 @@ def main():
     df = rename_columns(df, columns_to_rename)
     df = convert_type(df)
     df = treat_outliers(df)
-
+    df = normalize_format(df)
     df = treat_identification_columns(df)
     upload_data(df, upload_date_time_str)
 

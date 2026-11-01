@@ -15,12 +15,13 @@ p = Path(__file__).parent.resolve().parent
 Path(p / 'logs').mkdir(parents=True, exist_ok=True)
 
 format = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-filename_path = Path(p / 'logs' / 'extract_and_load_data.log')
+filename_path = p / 'logs' / 'extract_and_load_data.log'
+filename_path.parent.mkdir(parents=True, exist_ok=True)
 logging.basicConfig(format=format, filename=filename_path, encoding='utf-8', level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 env = p / '.env'
-env.touch()
+env.touch(exist_ok=True)
 load_dotenv(dotenv_path=env)
 
 def extract_data_model(page: int) -> pd.DataFrame:
@@ -33,7 +34,7 @@ def extract_data_model(page: int) -> pd.DataFrame:
             "https://api.geckoapi.com.br/v1/extract",
             headers={"Authorization": f"Bearer {os.environ['API_KEY']}"},
             json={
-                "url": "https://lista.mercadolivre.com.br/iphone-15-pro-max",
+                "url": "https://lista.mercadolivre.com.br/iphone-18-pro-max",
                 "target": "mercadolivre.com.br",
                 "type": "plp",
                 "page": page
@@ -71,7 +72,7 @@ def extract_data():
 
 def upload_data(data, date_time_str, key=None):
     if key is None:
-        key = f"bronze/mercadolivre/celulares-e-telefones/{date_time_str}/bronze_data.json"
+        key = f"bronze/mercadolivre/iphone-18-pro-max/{date_time_str}/bronze_data.json"
 
     if not os.getenv('S3_BUCKET_NAME'):
         logger.error("S3_BUCKET_NAME is not set in the environment variables.")
