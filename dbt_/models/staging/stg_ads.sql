@@ -32,9 +32,18 @@ SELECT
     COALESCE(NULLIF(highlight, ''), 'Sem destaque') AS highlight,
     COALESCE(NULLIF(currency, ''), 'Sem informação') AS currency,
     COALESCE(NULLIF(currency_raw, ''), 'Sem informação') AS currency_raw,
-    price,
-    rating,
-    review_count,
+     CASE 
+        WHEN price < 0 THEN NULL 
+        ELSE price 
+    END AS price,
+    CASE 
+        WHEN rating NOT BETWEEN 1 AND 5 THEN NULL 
+        ELSE rating 
+    END AS rating,
+    CASE 
+        WHEN review_count < 0 THEN NULL 
+        ELSE review_count 
+    END AS review_count,
     url,
     COALESCE(NULLIF(extracted_at, ''), 'Sem informação') AS extracted_at
 FROM silver

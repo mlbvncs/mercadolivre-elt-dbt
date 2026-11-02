@@ -137,15 +137,6 @@ def convert_type(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 #5
-def treat_outliers(df: pd.DataFrame) -> pd.DataFrame:
-    #price
-    df = df.dropna(subset='price', ignore_index=True)
-    #rating
-    df.loc[(df['rating'] < 1) | (df['rating'] > 5), 'rating'] = 0
-
-    return df
-
-#6
 def normalize_format(df: pd.DataFrame) -> pd.DataFrame:
     #extracted_at
     df['extracted_at'] = pd.to_datetime(df["extracted_at"])
@@ -161,7 +152,7 @@ def normalize_format(df: pd.DataFrame) -> pd.DataFrame:
 
     return df
 
-#7
+#6
 def treat_identification_columns(df: pd.DataFrame) -> pd.DataFrame:
     #unique
     df = df.drop_duplicates(subset=['url'], ignore_index=True)
@@ -198,7 +189,6 @@ def main():
     df = drop_unnecessary(df, drop_columns)
     df = rename_columns(df, columns_to_rename)
     df = convert_type(df)
-    df = treat_outliers(df)
     df = normalize_format(df)
     df = treat_identification_columns(df)
     upload_data(df, upload_date_time_str)
