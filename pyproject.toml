@@ -1,5 +1,5 @@
 [project]
-name = "valuemetrics"
+name = "mercadolivre-elt-dbt"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"

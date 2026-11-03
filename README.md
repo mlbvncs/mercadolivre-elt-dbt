@@ -1,8 +1,8 @@
-# Pipeline de ETL e Modelagem Dimensional: Anúncios de iPhone 18 Pro Max no Mercado Livre
+# Pipeline de ELT e Modelagem Dimensional: Anúncios de iPhone 18 Pro Max no Mercado Livre
 
 ## 1. Sobre o Projeto
 
-Este projeto de engenharia de dados foi desenvolvido para o meu portfólio e demonstra um pipeline end-to-end de ETL e modelagem dimensional. Ele simula um trabalho para uma empresa fictícia, a ValueMetrics, que precisa de dados acerca de anúncios de iPhone 18 Pro Max no Mercado Livre para que seus lojistas comparem seus preços de celulares e telefones com os atuais da concorrência.
+Este projeto de engenharia de dados foi desenvolvido para o meu portfólio e demonstra um pipeline end-to-end de ELT e modelagem dimensional. Ele simula um trabalho para uma empresa fictícia, a ValueMetrics, que precisa de dados acerca de anúncios de iPhone 18 Pro Max no Mercado Livre para que seus lojistas comparem seus preços de celulares e telefones com os atuais da concorrência.
 
 Ele segue a arquitetura medalhão, com os dados armazenados no Amazon S3. Na camada bronze, um script em Python extrai todas as páginas da listagem pela GeckoAPI e salva o JSON bruto; na silver, outro script em Python transforma os dados e grava o resultado em Parquet; na gold, o dbt, com DuckDB, lê a silver direto do S3, termina a transformação dos dados e modela os dados em dimensões e em uma tabela fato de anúncios.
 
@@ -10,12 +10,12 @@ A orquestração é feita pelo Apache Airflow em Docker: basta subir os containe
 
 ### 1.1. Pipeline
 
-<img src='pipeline.png' alt='Pipeline ETL e Modelagem Dimensional'>
+<img src='pipeline.png' alt='Pipeline ELT e Modelagem Dimensional'>
 
 ### 1.2. Stack Tecnológica
 
 #### Ferramentas
-- **Python 3.12**: Linguagem para ETL.
+- **Python 3.12**: Linguagem para ELT.
 - **GeckoAPI**: API para extração dos dados do Mercado Livre.
 - **Amazon S3**: Serviço de nuvem para armazenar os dados (camadas bronze, silver e gold).
 - **AWS IAM**: Serviço de nuvem para criar o user e policy necessários para o script Python interagir com o bucket do Amazon S3.
@@ -42,7 +42,7 @@ A orquestração é feita pelo Apache Airflow em Docker: basta subir os containe
 #### Pacotes dbt
 - **dbt_utils**: Geração de chaves substitutas (`generate_surrogate_key`) nas tabelas dimensão da camada gold.
 
-### 1.3. Etapas do Pipeline (ETL e Modelagem Dimensional)
+### 1.3. Etapas do Pipeline (ELT e Modelagem Dimensional)
 
 #### 1.3.1. Extração e Carga - Python
 
@@ -154,8 +154,8 @@ docker compose version
 ### 2.4. Clonar o Repositório
 
 ```bash
-git clone https://github.com/mlbvncs/mercadolivre-etl-dbt
-cd mercadolivre-etl-dbt
+git clone https://github.com/mlbvncs/mercadolivre-elt-dbt
+cd mercadolivre-elt-dbt
 ```
 
 ### 2.5. Criar Arquivo .env
