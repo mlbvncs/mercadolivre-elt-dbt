@@ -1,6 +1,6 @@
 {{ config(
     materialized='external',
-    location='s3://mlbvncs-valuemetrics-dev/gold/mercadolivre/iphone-18-pro-max/dim_currency.parquet',
+    location='s3://{{ env_var("S3_BUCKET_NAME") }}/gold/mercadolivre/iphone-18-pro-max/dim_currency.parquet',
     format='parquet'
 ) }}
 

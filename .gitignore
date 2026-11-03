@@ -11,7 +11,12 @@ wheels/
 .env
 .ruff_cache
 .vscode
-logs
+logs/*
+!logs/.gitkeep
+config/*
+!config/.gitkeep
+plugins/*
+!plugins/.gitkeep
 
 # DuckDB
 *.duckdb
