@@ -1,5 +1,7 @@
 # Pipeline de ELT e Modelagem Dimensional: Anúncios de iPhone 18 Pro Max no Mercado Livre
 
+> **Resumo:** Pipeline de dados end-to-end (ELT) construído com **Python, dbt, DuckDB, Amazon S3 e Apache Airflow**. O projeto simula uma necessidade real de negócio (ValueMetrics) e aplica a arquitetura medalhão e modelagem dimensional (Kimball).
+
 ## 1. Sobre o Projeto
 
 Este projeto de engenharia de dados foi desenvolvido para o meu portfólio e demonstra um pipeline end-to-end de ELT e modelagem dimensional. Ele simula um trabalho para uma empresa fictícia, a ValueMetrics, que precisa de dados acerca de anúncios de iPhone 18 Pro Max no Mercado Livre para que seus lojistas comparem seus preços de celulares e telefones com os atuais da concorrência.
@@ -34,6 +36,7 @@ A orquestração é feita pelo Apache Airflow em Docker: basta subir os containe
 - **dbt-core**: Framework de transformação de dados em SQL.
 - **dbt-duckdb**: Adaptador do dbt para o DuckDB.
 - **ipynbname**: Identificação do notebook Jupyter em execução.
+- **astronomer-cosmos**: Integração do dbt ao Airflow (DbtTaskGroup).
 
 #### Ferramentas de Desenvolvimento
 - **ipykernel**: Kernel Jupyter para execução do notebook.
@@ -87,17 +90,17 @@ A orquestração é feita pelo Apache Airflow em Docker: basta subir os containe
 - Valida o EXTRACT_DATETIME antes de qualquer leitura, falhando cedo com TypeError e log, para não procurar um arquivo inexistente no S3.
 - A leitura do bronze fica dentro de um try/except, que registra no log qualquer erro ocorrido durante a leitura e o relança com raise.
 - O envio do silver também fica dentro de um try/except, que registra no log qualquer erro ocorrido durante a conversão para Parquet e o upload e o relança com raise.
-- - Os erros ficam registrados em logs/transform_data.log e, por serem relançados, interrompem o pipeline em vez de seguir com dados incompletos.
+- Os erros ficam registrados em logs/transform_data.log e, por serem relançados, interrompem o pipeline em vez de seguir com dados incompletos.
 - Cada etapa bem-sucedida de leitura e envio também fica registrada no log.
 
 #### 1.3.3. Transformação e Modelagem Dimensional - dbt
 
 **Processo de Design Dimensional em Quatro Etapas:**
 
-- Processo de negócio: O processo de negócio da GeckoAPI utilizado no projeto é prover dados públicos estruturados de anúncios de iPhones 18 Pro Max do Mercado Livre
-- Declarar a granularidade: Cada linha da tabela fct_ads representa um anúncio individual (identificado pela sua url única) de um iPhone 18 Pro Max no Mercado Livre, no momento da extração
-- Identificar as dimensões: currency, seller, product e highligh
-- Identificar os fatos: price, rating e review_count
+- Processo de negócio: O processo de negócio da GeckoAPI utilizado no projeto é prover dados públicos estruturados de anúncios de iPhones 18 Pro Max do Mercado Livre.
+- Declarar a granularidade: Cada linha da tabela fct_ads representa um anúncio individual (identificado pela sua url única) de um iPhone 18 Pro Max no Mercado Livre, no momento da extração.
+- Identificar as dimensões: currency, seller, product e highlight.
+- Identificar os fatos: price, rating e review_count.
 
 **Arquivos**: [models](dbt_/models/)
 
@@ -123,6 +126,25 @@ A orquestração é feita pelo Apache Airflow em Docker: basta subir os containe
 - Na pasta marts, os joins da fato são LEFT JOIN, então nenhum anúncio é descartado mesmo que falte correspondência em alguma dimensão.
 - Na pasta staging, os outliers das métricas viram nulo em vez de receber um valor inventado, como recomenda Kimball para métricas desconhecidas na fato.
 
+#### 1.3.4. Orquestração - Apache Airflow
+
+**Arquivo**: [dags/pipeline_dag.py](dags/pipeline_dag.py)
+
+**Configuração do dbt (astronomer-cosmos):**
+- **ProjectConfig**: Aponta para a pasta dbt_ e repassa credenciais AWS e o TRANSFORM_DATETIME. A data é lida do .env a cada execução da DAG (e não de os.environ) porque o transform_data.py a grava no arquivo durante o pipeline.
+- **ProfileConfig**: Usa o DuckDB em arquivo (dev.duckdb) porque os modelos marts precisam enxergar as views criadas no staging em processos separados. Inclui as extensões httpfs/parquet, o segredo S3 e o bloco `retries` (`connect_attempts=5`), que faz o dbt esperar o lock do arquivo ser liberado antes de falhar.
+
+**Tarefas:**
+- **extract_and_load_data** e **transform_data**: BashOperators que rodam os scripts Python correspondentes.
+- **dbt_build**: DbtTaskGroup do Cosmos que cria uma tarefa para cada modelo do dbt. Possui `operator_args` com `retries=5` e `retry_delay=60s`.
+- A ordem é sequencial (extract >> transform >> dbt), e uma etapa só inicia se a anterior for bem-sucedida.
+
+**Agendamento e Blindagens:**
+- Roda `@daily` com `catchup=False` para não disparar extrações retroativas e consumir créditos da GeckoAPI de uma vez.
+- `max_active_tasks=1` garante que apenas uma tarefa rode por vez, evitando que tarefas paralelas do dbt travem o arquivo DuckDB.
+- **Blindagem contra lock no DuckDB**: Dupla camada. O dbt tenta reconectar ao banco sozinho (via `profile_args`), e se ainda assim falhar, o Airflow reinicia a tarefa do modelo (via `operator_args`). As tarefas Python (extração/transformação) não têm retentativas para não gastar créditos à toa.
+- Como os scripts Python relançam os erros, o pipeline interrompe o fluxo automaticamente se algo falhar, sem seguir com dados incompletos.
+
 ### 1.4. Decisões arquiteturais
 
 - **Não ter Slowly Changing Dimension Type 2**: O plano inicial do projeto era utilizar dbt snapshots para ter SCD2 nas dimensões para o caso de ser feita mais de uma extração de dados. Cheguei a implementar, porém diferente do que aparece na documentação da GeckoAPI, colunas que serviriam como chaves naturais vieram com valores nulos, portanto se tornou insustentável escolher uma chave natural (uma ou mais colunas) e conseguir versionar sem saber o que poderia vir nulo em diferentes extrações.
@@ -130,15 +152,24 @@ A orquestração é feita pelo Apache Airflow em Docker: basta subir os containe
 
 ## 2. Rodando o Projeto
 
-### 2.1. Instalar o Docker para seu Sistema Operacional
+> Este projeto foi desenvolvido e testado no **Linux**. Em outros sistemas operacionais, podem ser necessárias adaptações.
 
-- [Linux](https://docs.docker.com/engine/install/)
-- [Windows](https://docs.docker.com/desktop/setup/install/windows-install/)
-- [Mac](https://docs.docker.com/desktop/setup/install/mac-install/)
+### 2.1. Instalar o Docker Engine
 
-No Windows e no macOS, abra o Docker Desktop antes de rodar os comandos.
+- Siga o guia oficial de instalação do [Docker Engine](https://docs.docker.com/engine/install/).
 
-Para conferir se deu certo:
+> Crie o bucket na região **sa-east-1** (São Paulo), a região usada pelo projeto.
+
+Para conferir se a instalação deu certo, rode:
+
+```bash
+docker run hello-world
+```
+
+> Se o comando pedir `sudo`, siga os [passos pós-instalação do Docker](https://docs.docker.com/engine/install/linux-postinstall/).
+
+A mensagem `Hello from Docker!` deve aparecer no terminal. Depois, confira também o Docker Compose:
+
 ```bash
 docker compose version
 ```
@@ -149,7 +180,7 @@ docker compose version
 
 ### 2.3. Criar Bucket no Amazon S3 e user e policy AWS IAM
 
-- Siga o passo a passo da publicação [Uploading Files to AWS S3 using Python and Boto3](https://medium.com/@financial_python/uploading-files-to-aws-s3-using-python-and-boto3-622efbe1af5c#id_token=eyJhbGciOiJSUzI1NiIsImtpZCI6Ijk0M2EzYTVkN2Q5MTk2MjVhNDU0ZTQ4OWI3NWMyOWFkYWI1N2FjYmEiLCJ0eXAiOiJKV1QifQ.eyJpc3MiOiJodHRwczovL2FjY291bnRzLmdvb2dsZS5jb20iLCJhenAiOiIyMTYyOTYwMzU4MzQtazFrNnFlMDYwczJ0cDJhMmphbTRsamRjbXMwMHN0dGcuYXBwcy5nb29nbGV1c2VyY29udGVudC5jb20iLCJhdWQiOiIyMTYyOTYwMzU4MzQtazFrNnFlMDYwczJ0cDJhMmphbTRsamRjbXMwMHN0dGcuYXBwcy5nb29nbGV1c2VyY29udGVudC5jb20iLCJzdWIiOiIxMDY3MjYyNTQ0MDU3NzI2MzYzMjgiLCJlbWFpbCI6Im1hbGJhdjEwMEBnbWFpbC5jb20iLCJlbWFpbF92ZXJpZmllZCI6dHJ1ZSwibm9uY2UiOiJub3RfcHJvdmlkZWQiLCJuYmYiOjE3OTIwNjkyMTEsIm5hbWUiOiJNQUxCQSBWSU5JQ0lVUyBMT1BFUyBTQU5UT1MiLCJwaWN0dXJlIjoiaHR0cHM6Ly9saDMuZ29vZ2xldXNlcmNvbnRlbnQuY29tL2EvQUNnOG9jTFVNbmZrVHJaQTdybzhpWjh0NmVJOHA5dGZHX3M5b0trTVRNNDNHQ3kwUWRpQTEyb0M9czk2LWMiLCJnaXZlbl9uYW1lIjoiTUFMQkEgVklOSUNJVVMiLCJmYW1pbHlfbmFtZSI6IkxPUEVTIFNBTlRPUyIsImlhdCI6MTc5MjA2OTUxMSwiZXhwIjoxNzkyMDczMTExLCJqdGkiOiJjMTE2MWUxZjBmOTUyM2JmNWM3YjUyNjdkNTYxNGY1MjQwZDg5ZmEzIn0.d2ih0SiiiMYhAVyvc-Dg3CYrFMJoHB6QBN7a_wpfJFf-TuWnA_5ageF4nhy5t7QO7nDoLTqZtsIsBh5Rv6HvRY8zME7tCusOtwHLJjj8r2yLkBFFmh2J9cD-3eUOkCevNDRyUNLNf6p2xOCDo3q7MSNfcJaAcpv68OOtuHDqNLb8Kl_laOxxzo9NwhE__wUaULdRIAY-I63UR33o0J-pQ1uth7wCbVYBYynb_fUgzrnSDk-gJajvyagjdnIY_fRnKTDYnW0BanQYOh4Jddp7laJPiiO6bmHBMH4A3xWPgCC38d-u-4W3QD9nrVo7AWMwePUyRVDVQ_NbrVLusmocZw) 
+- Siga o passo a passo da publicação [Uploading Files to AWS S3 using Python and Boto3](https://medium.com/@financial_python/uploading-files-to-aws-s3-using-python-and-boto3-622efbe1af5c) 
 
 ### 2.4. Clonar o Repositório
 
@@ -167,30 +198,39 @@ API_KEY=''
 S3_BUCKET_NAME=''
 AWS_ACCESS_KEY_ID=''
 AWS_SECRET_ACCESS_KEY=''
-_PIP_ADDITIONAL_REQUIREMENTS=dbt-core dbt-duckdb
+_PIP_ADDITIONAL_REQUIREMENTS=dbt-core dbt-duckdb astronomer-cosmos
 ```
 
-O Airflow roda dentro de um container e escreve nas pastas
-`logs/`, `dags/`, `plugins/` e `config/` do seu PC. Rode o comando abaixo para o container
-usar o mesmo número de usuário (UID) que o seu, para ele ter permissão de escrita
-nessas pastas. Sem isso, pode dar `Permission denied`.
+Em seguida, acrescente ao `.env` o `AIRFLOW_UID` e a `AIRFLOW_JWT_SECRET`, rodando no terminal, na raiz do projeto:
 
 ```bash
+sed -i -e '$a\' .env
 echo "AIRFLOW_UID=$(id -u)" >> .env
+echo "AIRFLOW_JWT_SECRET=$(openssl rand -hex 32)" >> .env
 ```
+
+- **`AIRFLOW_UID`**: o Apache Airflow escreve nas pastas locais do projeto (`logs/`, `dags/`, etc.), e essa variável evita erros de escrita (`Permission denied`).
+- **`AIRFLOW_JWT_SECRET`**: chave que autentica a comunicação entre os componentes do Airflow. Ela é gerada aleatoriamente na sua máquina e fica só no seu `.env`, que não vai para o repositório.
+
 
 ### 2.6. Utilizando a Orquestração do Apache Airflow
 
-Para criar e iniciar o container do Apache Airflow, rode o comando:
+Para criar e iniciar os containers do Apache Airflow, rode o comando:
 
 ```bash
 docker compose up -d
 ```
 
-Para rodar o pipeline de orquestração:
-- Acesse: [Apache Airflow](localhost:8080). 
+> Na primeira subida, o Airflow leva alguns minutos para responder em `localhost:8080`, pois os containers instalam as dependências ao iniciar.
+
+Após o container ser criado, para rodar o pipeline de orquestração:
+- Acesse: [Apache Airflow](http://localhost:8080). 
 - Preencha os campos Username e Password com `airflow`.
 - Pesquise por `geckoapi_pipeline_dag`, escolha e acione.
+
+O resultado deve ser: 
+
+<img src='apache-airflow.png' alt='Apache Airflow'>
 
 Após finalizar, para parar e remover completamente os contêineres e redes criados pelo projeto, rode:
 
